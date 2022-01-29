@@ -1,0 +1,769 @@
+---
+title: "603 Project - Car selling price predictor"
+author: "Team-1"
+date: "04/12/2021"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+
+header-includes:
+- \usepackage[fontsize=12pt]{scrextend}
+  \usepackage{fvextra}
+  \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Introduction
+
+The Indian used car market is expected to reach a size of over 70 lakh vehicles by 2025-26, up from 38 lakh in 2020-21, growing at around 12-14 per cent over the next few years, according to a study. The used car industry is expected to clock a growth rate of 15 per cent in FY22 as the COVID-19 pandemic, digitization, changing demographics and aspirations, first-time buyers, and availability of financing options acting as growth drivers, as per the OLX Autos-CRISIL Study 2021.
+
+**Research question** 
+
+Investigating the factors that have a statistical significance on the price of used car.
+
+**Expected finding** 
+
+To develop a best fit model that predict the price of car given the required predictor variables.
+
+**Topic** 
+
+Being a student, it is difficult to afford a new car and most of the time they choose to buy a second-hand car. Also, students who have very little knowledge about cars find it difficult to figure out if the price for the car is fair based on its specifications.
+
+**Data** 
+
+The data is being collected from Kaggle and the data is scraped from cardekho.com. It contains 8100 rows and 13 columns.
+
+## Methodology
+
+**Descriptive Statistics**
+
+  **Response Variable:** selling_price – This variable has the selling price of the used cars in CAD.
+  
+  **Independent Variables:**
+  
+**•	Quantitative variables:**\
+1.	km_driven – Total distance the car has travelled. The units are Kilometres.
+
+2.	Mileage – The distance that a car travels per 1 litre of fuel. The units are in km/ltr
+
+3.	Engine – The space/volume available inside the tank to accommodate air-fuel mix for burning. The units are in CC (cubic capacity)
+
+4.	Max_power – The power available at the shaft of an engine. The unit is bhp (brake horsepower)
+
+5.	Age – This variable shows how old the car is in number of years.
+
+**•	Qualitative variables:**\
+1.	Fuel - The type of fuel the car runs on. Types: Petrol, diesel, CNG, LPG
+
+2.	Seller-type – Whether it’s being sold by a dealer or an individual.
+
+3.	Transmission – There are 2 types: Manual or Automatic
+
+4.	Owner – By how many people the car has been owned. Types: First, Second, Third, Fourth & Above or Test drive car
+
+5.	Seats – Number of seats present in the vehicle 
+
+
+**Modeling** 
+
+Part 1 - Data cleaning and wrangling 
+
+1. Import the CSV file in R
+2. Removed the columns 'name' and torque'
+3. Removed the rows that contained 'km/kg' in the 'mileage' column
+4. All the units present in the 'mileage', 'engine', and 'max_power' is removed
+5. The age of the car is calculated by taking the difference between 2020 and the 'year' of the car. This is stored in the column 'age'
+6.The columns 'mileage', 'engine', and 'max_power' are changed to numeric values
+7. All 'NA' values are removed
+8. The 'selling_price' is in Rupees. This is changed to CAD
+
+Part 2 - Modeling
+
+1. Plotting relationship between each individual variable and response variable.
+2. Checking all pairwise combinations of predictors in scatter plots and using the VIF function(Test the multi-colinearity assumption)
+3. Implement the full model
+4. Use step wise regression (with backward elimination) to find the ‘’best’’ set of predictors of selling_price
+5. Use all-possible-regressions-selection to find the ‘’best’’ predictors of selling_price (Cp, AIC, Adjusted R2)
+6. Test the hypothesis for the full model. 
+7. Conducting a partial F-test, to test if number of seats should be kept in the model.
+8. Build an interaction model to fit the multiple regression model from the model.
+9. Conduct a partial t-test to check for significance of interaction term.
+10. Create a model fit which contains higher degrees.
+11. Compare the R ^2adjusted value and RMSE value of the addictive model, interaction model and higher model.
+12. Test the best model for model assumptions such as equal variance, linearity, normality.
+13. Check for outlines using the cook's distance. 
+14. Model transformation
+15. Finalize the model. Predict the selling_price.
+
+
+## Part 1 - Data cleaning and wrangling 
+
+**1. Import the CSV file in R**
+
+```{r error=FALSE}
+library(tidyverse)
+car = read.csv("/Users/ohamugochukwu/Desktop/Car (1).csv")
+```
+
+**2. Removed the columns 'name' and torque'**
+```{r}
+car1 = subset(car, select = -c(name,torque ))
+
+```
+
+**3. Removed the rows that contained 'km/kg' in the 'mileage' column**
+```{r}
+car1 = car1[!grepl("km/kg", car1$mileage),]
+```
+
+
+**4. All the units present in the 'mileage', 'engine', and 'max_power' is removed**
+**5. The age of the car is calculated by taking the difference between 2020 and the 'year' of the car. This is stored in the column 'age'**
+
+```{r}
+library(stringr)
+car1$mileage = str_split_fixed(car1$mileage, " ", 2)[ ,1]
+car1$engine = str_split_fixed(car1$engine, " ", 2)[ ,1]
+car1$max_power = str_split_fixed(car1$max_power, " ", 2)[ ,1] # remove the units from the column
+car1$year = 2020 - car1$year
+```
+
+```{r}
+car1  = car1 %>% rename(age= year) #rename the year to age. To show age of the car 
+
+```
+
+
+**6.The columns 'mileage', 'engine', and 'max_power' are changed to numeric values**\
+**7. All 'NA' values are removed**\
+**8. The 'selling_price' is in Rupees. This is changed to CAD**
+
+```{r}
+car1$mileage = as.numeric(car1$mileage)
+car1$engine = as.numeric(car1$engine)
+car1$max_power = as.numeric(car1$max_power) # convert the values to numeric
+car1 = na.omit(car1) #remove na values
+car1$selling_price = car1$selling_price/60 #convert price to CAD dollars
+head(car1)
+
+```
+
+```{r}
+Car1 = car1
+```
+
+
+
+## Part 2 - Modeling
+
+**1. Plotting relationship between each individual variable and response variable.**
+
+```{r}
+ggplot(data=Car1,mapping= aes(x=km_driven,y=selling_price))+geom_point(color='red')+  
+  geom_smooth(method = "lm", se = FALSE)+ggtitle("Selling Price Against Km Driven")+
+  scale_x_log10()
+  
+```
+The scatter plot above, shows that there is an inverse linear realtionship between the the selling price of a car and the distance in kilometers the car has covered.
+
+```{r}
+ggplot(data=Car1,mapping= aes(x=age,y=selling_price))+geom_point(color='red')+  
+geom_smooth(method = "lm", se = FALSE)+ggtitle("Selling Price Against Age")
+```
+The scatter plot above shows that there is an inverse linear relationship between the selling price of a car and the age of the car.
+
+```{r}
+#ggplot(data=Car1,mapping= aes(x=fuel,y=selling_price))+ geom_boxplot()
+boxplot(selling_price~fuel,data=Car1, 
+        main = "Boxplot of Selling Price Against Fuel Type")
+```
+From the boxplot diagram above, the median of the cars that run on diesel, is slightly higher that cars that run on petrol. Although the diesel data has more outliers.
+
+```{r}
+ggplot(data=Car1,mapping= aes(x=seller_type,y=selling_price))+ geom_boxplot()+
+  ggtitle("Boxplot of Selling Price Against Seller Type")
+```
+
+
+```{r}
+ggplot(data=Car1,mapping= aes(x=transmission,y=selling_price))+ geom_boxplot()+
+  ggtitle("Boxplot of Selling Price Against Transmission")
+```
+The boxplot diagram above indicates that the median of cars with automatic transmission, is higher than that with manual transmission.
+
+```{r}
+ggplot(data=Car1,mapping= aes(x=owner,y=selling_price))+ geom_boxplot()+
+  ggtitle("Boxplot of Selling Price Against Owner")
+```
+
+
+```{r}
+ggplot(data=Car1,mapping= aes(x=mileage,y=selling_price))+geom_point(color='red')+  
+  geom_smooth(method = "lm", se = FALSE)+ggtitle("Selling Price Against Mileage")
+```
+From the scattered plot above, the selling price of a used car has an inverse relationship with the mileage of the car. That is, as the mileage increases, the selling price of the car decreases.
+
+```{r}
+ggplot(data=Car1,mapping= aes(x=engine,y=selling_price))+geom_point(color='red')+  
+  geom_smooth(method = "lm", se = FALSE)+ggtitle("Selling Price Against Engine")
+```
+From the scattered plot above, the selling price of a used car has a positive relationship with the engine of the car. That is, as the engine capacity increases, the selling price of the car increases.
+
+```{r}
+ggplot(data=Car1,mapping= aes(x=max_power,y=selling_price))+geom_point(color='red')+  
+  geom_smooth(method = "lm", se = FALSE)+ggtitle("Selling Price Against Maximum Power")
+```
+The scattered plot diagram above shows the positive linear relationship between the selling price of a used car and the maximum power produced by the car.
+
+```{r}
+ggplot(data=Car1,mapping= aes(x=factor(seats),y=selling_price))+ geom_boxplot()+
+  ggtitle("Boxplot of Selling Price Against no of Seats")
+```
+
+**2. Checking all pairwise combinations of predictors in scatter plots and using the VIF function (Test the multi-colinearity assumption)**
+
+```{r echo=TRUE}
+#Test the model for multicollinearity
+firstordermodel = lm(selling_price ~ age + km_driven + factor(fuel) + factor(seller_type) 
+                       + factor(transmission)+ factor(owner)+ mileage + engine + max_power+
+                     factor(seats),data = Car1)
+
+#pairwise combinations
+library(GGally)
+pairs(~age + km_driven + factor(fuel) + factor(seller_type) 
+                      + factor(transmission)+ factor(owner)+ mileage + engine + max_power+
+                     factor(seats),data = Car1,)
+
+#ggpairs(firstordermodel,lower =list(continuous ="smooth_loess", 
+          #combo ="facethist", discrete ="facetbar", na ="na"))
+
+# VIF function
+library(mctest)
+imcdiag(firstordermodel,method = "VIF")
+
+
+```
+From the pairs plot and vif calculation above, there is no correlation between any of the predictor variables. Hence, we conclude that there is no multi-collinearity among the predictor variables. However, there is a correlation between the seat predictor variable itself.
+
+**3. Implement the full model**
+
+```{r echo=TRUE}
+#Fit a linear model based on selected predictor variables.
+
+firstordermodel = lm(selling_price ~ age + km_driven + factor(fuel) + factor(seller_type) 
+                       + factor(transmission)+ factor(owner)+ mileage + engine + max_power + factor(seats)
+                     ,data = Car1)
+
+
+summary(firstordermodel)
+
+```
+
+From the result of fitting a linear model using all possible independent variables, the $R^2_{adj}$ is: 0.6947; meaning 69.47% of the variation in selling price of a used car, can be explained by the model.
+
+**4. Use stepwise regression (with backward elimination) to find the 'best' set of predictors of selling_price**
+
+```{r echo=TRUE}
+# stepwise 
+library(olsrr)
+stepmod=ols_step_backward_p(firstordermodel, prem = 0.3, details=TRUE)
+summary(stepmod$model)
+```
+
+From the result of the backwards elimination model, suitable significant predictors of the selling price of a used car are: age, km_driven, fuel, seller_type, transmission, owner, mileage, engine and max_power
+
+
+**5. Use all-possible-regressions-selection to find the 'best' predictors of selling_price (Cp, AIC, Adjusted R2)**
+
+```{r echo=TRUE}
+library(olsrr)
+best_model = ols_step_best_subset(firstordermodel, details = TRUE)
+par(mfrow=c(2,2))
+plot(best_model$cp,type = "o",pch = 10, xlab= "Number of Variables",
+     ylab = "Cp")
+plot(best_model$aic,type = "o",pch = 10, xlab= "Number of Variables",
+     ylab = "AIC")
+plot(best_model$adjr,type = "o",pch = 10, xlab= "Number of Variables",
+     ylab = "AdjustedR^2")
+plot(best_model$rsq,type = "o",pch = 10, xlab= "Number of Variables",
+     ylab = "R-square")
+```
+
+From the output above, the model with 9 predictors has the lowest Cp and AIC. Furthermore, it also has the highest $R^2_{adj}$ value. Hence, the model with 9 predictors will be the best at predicting the selling price of a used car.
+
+**6. Test the hypothesis for the full model.**
+
+Using the Global F test to confirm that the independent variable are suitable for predicting the selling price of a used car at significance level 0.05.
+
+
+$H_{0} : \beta_{1} = \beta_{2} = .. = \beta_{p} = 0$\
+$H_{a}$ : at least one of $\beta_{i}$ in not zero (i= 1,2,..p)\
+
+```{r echo=TRUE}
+#If the p-value of f-test is less than 0.05, conduct a partial t-test to check the significance of each predictor variable.
+new_firstordermodel = lm(selling_price ~ age + km_driven + factor(fuel) + factor(seller_type) 
+                       + factor(transmission)+ factor(owner)+ mileage + engine + max_power
+                     ,data = Car1)
+summary(new_firstordermodel)
+```
+```{r echo=TRUE}
+#  Conduct a global F-test to check for overall model significance.
+reduced_reg = lm(selling_price ~ 1,data = Car1)
+anova(reduced_reg,new_firstordermodel)
+```
+
+From the result of the full model F-test conducted above, the F-calc is 1296 and the p-value: 2.2e-16 < 0.05. This indicates that atleast one of the independent predictor variable is not equal to 0.  
+
+
+**7. Conducting a partial F-test, to test if number of seats should be kept in the model.**
+
+$H_0 : \beta_{10}= 0$\
+$H_a : \beta_{10} \neq 0$\
+
+```{r echo=TRUE}
+# partial F-test
+anova(new_firstordermodel,firstordermodel)
+```
+
+From the result of the partial F-test above, since F-calc is 38.514 and the p-value: 2.2e-16 < 0.05, we reject the null hypothesis. This indicates that the seat predictor should be kept in the model.
+
+
+
+Although the result of the partial F-test conducted above rejects the null hypothesis, indicating the number of seats variable be kept in the model, but by conducting the backward elimination, the best subset and a partial t-test, we concluded on using the model without the seat predictor variable.
+
+
+**8. Build an interaction model to fit the multiple regression model.**
+
+```{r echo=TRUE}
+#Check for interaction terms among the significant predictor variables.
+
+Interac_firstordermodel = lm(selling_price ~ (age + km_driven + factor(fuel) + factor(seller_type) 
+                       + factor(transmission)+ factor(owner)+ mileage + engine + max_power)^2
+                     ,data = Car1)
+summary(Interac_firstordermodel)
+
+```
+
+From the result of fitting interaction terms above, since not all the interaction terms are significant, we will refit the model with only the significant interaction terms.
+
+**9. Conduct a partial t-test to check for significance of interaction term.**
+
+$H_0 : \beta_{i}= 0$\
+$H_a : \beta_{i} \neq 0$\
+
+```{r echo=TRUE}
+# Interaction model 
+#Conduct a partial t-test to check for significance of interaction term.
+new_Interac_firstordermodel = lm(selling_price ~ age + km_driven + factor(fuel) + factor(seller_type) 
+                       + factor(transmission)+ factor(owner)+ mileage + engine + max_power + age*km_driven + age*factor(fuel) + age*factor(seller_type)
+                       + age*factor(transmission) + age*factor(owner) + age*engine + age*max_power + km_driven*factor(seller_type)
+                       + km_driven*factor(transmission) + km_driven*factor(transmission) + km_driven*max_power + factor(fuel)*factor(transmission)
+                       + factor(fuel)*factor(owner) + factor(fuel)*mileage + factor(fuel)*engine + factor(fuel)*max_power + factor(seller_type)*mileage
+                       + factor(seller_type)*engine + factor(seller_type)*max_power + factor(transmission)*factor(owner) + factor(transmission)*engine
+                       + factor(transmission)*max_power + factor(owner)*mileage + factor(owner)*engine + mileage*engine + mileage*max_power
+                       + engine*max_power
+                     ,data = Car1)
+
+summary(new_Interac_firstordermodel)
+```
+
+After refitting the model with only significant interaction terms, the $R^2_{adj}$ value is 0.9112. This indicates that 91.12% of the variation of selling price of a used car can be explained by the interaction model.
+
+**10. Create a model fit which contains higher degrees.**
+
+```{r echo=TRUE}
+#Create a model fit which contains higher degrees.
+
+
+
+
+Pwer_new_Interac_firstordermodel = lm(selling_price ~ age + I(age^2) +I(age^3)+I(age^4)+ km_driven + factor(fuel) + factor(seller_type) 
+                       + factor(transmission)+ factor(owner)+ mileage + engine + max_power + age*km_driven + age*factor(fuel) + age*factor(seller_type)
+                       + age*factor(transmission) + age*factor(owner) + age*engine + age*max_power + km_driven*factor(seller_type)
+                       + km_driven*factor(transmission) + km_driven*factor(transmission) + km_driven*max_power + factor(fuel)*factor(transmission)
+                       + factor(fuel)*factor(owner) + factor(fuel)*mileage + factor(fuel)*engine + factor(fuel)*max_power + factor(seller_type)*mileage
+                       + factor(seller_type)*engine + factor(seller_type)*max_power + factor(transmission)*factor(owner) + factor(transmission)*engine
+                       + factor(transmission)*max_power + factor(owner)*mileage + factor(owner)*engine + mileage*engine + mileage*max_power
+                       + engine*max_power
+                     ,data = Car1)
+
+
+
+summary(Pwer_new_Interac_firstordermodel)
+
+```
+
+Upon adding higher degrees of predictors, we find that there is no significant change in the $R^2_{adj}$ values. By keeping these terms, we also risk the chance of overfitting the model. Hence, we do not add higher order terms of the predictors to the model.
+
+
+```{r echo=TRUE}
+#Create a model fit which contains higher degrees.
+
+
+
+
+Pwer_new_Interac_firstordermodel1 = lm(selling_price ~ age + km_driven+ I(km_driven^2)+ I(km_driven^3)+ I(km_driven^4) + factor(fuel) + factor(seller_type) 
+                       + factor(transmission)+ factor(owner)+ mileage + engine + max_power + age*km_driven + age*factor(fuel) + age*factor(seller_type)
+                       + age*factor(transmission) + age*factor(owner) + age*engine + age*max_power + km_driven*factor(seller_type)
+                       + km_driven*factor(transmission) + km_driven*factor(transmission) + km_driven*max_power + factor(fuel)*factor(transmission)
+                       + factor(fuel)*factor(owner) + factor(fuel)*mileage + factor(fuel)*engine + factor(fuel)*max_power + factor(seller_type)*mileage
+                       + factor(seller_type)*engine + factor(seller_type)*max_power + factor(transmission)*factor(owner) + factor(transmission)*engine
+                       + factor(transmission)*max_power + factor(owner)*mileage + factor(owner)*engine + mileage*engine + mileage*max_power
+                       + engine*max_power
+                     ,data = Car1)
+
+
+
+summary(Pwer_new_Interac_firstordermodel1)
+
+```
+
+Upon adding higher degrees of predictors, we find that there is no significant change in the $R^2_{adj}$ values. By keeping these terms, we also risk the chance of overfitting the model. Hence, we do not add higher order terms of the predictors to the model.
+
+
+```{r echo=TRUE}
+#Create a model fit which contains higher degrees.
+
+
+
+
+Pwer_new_Interac_firstordermodel2 = lm(selling_price ~ age + km_driven + factor(fuel) + factor(seller_type) 
+                       + factor(transmission)+ factor(owner)+ mileage + I(mileage^2)  + I(mileage^3)+ I(mileage^4) + engine + max_power + age*km_driven + age*factor(fuel) + age*factor(seller_type)
+                       + age*factor(transmission) + age*factor(owner) + age*engine + age*max_power + km_driven*factor(seller_type)
+                       + km_driven*factor(transmission) + km_driven*factor(transmission) + km_driven*max_power + factor(fuel)*factor(transmission)
+                       + factor(fuel)*factor(owner) + factor(fuel)*mileage + factor(fuel)*engine + factor(fuel)*max_power + factor(seller_type)*mileage
+                       + factor(seller_type)*engine + factor(seller_type)*max_power + factor(transmission)*factor(owner) + factor(transmission)*engine
+                       + factor(transmission)*max_power + factor(owner)*mileage + factor(owner)*engine + mileage*engine + mileage*max_power
+                       + engine*max_power
+                     ,data = Car1)
+
+
+
+summary(Pwer_new_Interac_firstordermodel2)
+
+```
+
+Upon adding higher degrees of predictors, we find that there is no significant change in the $R^2_{adj}$ values. By keeping these terms, we also risk the chance of overfitting the model. Hence, we do not add higher order terms of the predictors to the model.
+
+
+```{r echo=TRUE}
+#Create a model fit which contains higher degrees.
+
+
+
+
+Pwer_new_Interac_firstordermodel3 = lm(selling_price ~ age + km_driven + factor(fuel) + factor(seller_type) 
+                       + factor(transmission)+ factor(owner)+ mileage  + engine + I(engine^2)+ I(engine^3) + I(engine^4)  + max_power + age*km_driven + age*factor(fuel) + age*factor(seller_type)
+                       + age*factor(transmission) + age*factor(owner) + age*engine + age*max_power + km_driven*factor(seller_type)
+                       + km_driven*factor(transmission) + km_driven*factor(transmission) + km_driven*max_power + factor(fuel)*factor(transmission)
+                       + factor(fuel)*factor(owner) + factor(fuel)*mileage + factor(fuel)*engine + factor(fuel)*max_power + factor(seller_type)*mileage
+                       + factor(seller_type)*engine + factor(seller_type)*max_power + factor(transmission)*factor(owner) + factor(transmission)*engine
+                       + factor(transmission)*max_power + factor(owner)*mileage + factor(owner)*engine + mileage*engine + mileage*max_power
+                       + engine*max_power
+                     ,data = Car1)
+
+
+
+summary(Pwer_new_Interac_firstordermodel3)
+
+```
+
+Upon adding higher degrees of predictors, we find that there is no significant change in the $R^2_{adj}$ values. By keeping these terms, we also risk the chance of overfitting the model. Hence, we do not add higher order terms of the predictors to the model.
+
+```{r echo=TRUE}
+#Create a model fit which contains higher degrees.
+
+
+
+
+Pwer_new_Interac_firstordermodel4 = lm(selling_price ~ age + km_driven + factor(fuel) + factor(seller_type) 
+                       + factor(transmission)+ factor(owner)+ mileage  + engine + max_power + I(max_power^2) + age*km_driven + age*factor(fuel) + age*factor(seller_type)
+                       + age*factor(transmission) + age*factor(owner) + age*engine + age*max_power + km_driven*factor(seller_type)
+                       + km_driven*factor(transmission) + km_driven*factor(transmission) + km_driven*max_power + factor(fuel)*factor(transmission)
+                       + factor(fuel)*factor(owner) + factor(fuel)*mileage + factor(fuel)*engine + factor(fuel)*max_power + factor(seller_type)*mileage
+                       + factor(seller_type)*engine + factor(seller_type)*max_power + factor(transmission)*factor(owner) + factor(transmission)*engine
+                       + factor(transmission)*max_power + factor(owner)*mileage + factor(owner)*engine + mileage*engine + mileage*max_power
+                       + engine*max_power
+                     ,data = Car1)
+
+
+
+summary(Pwer_new_Interac_firstordermodel4)
+
+```
+Upon adding higher degrees of predictors, we find that there is no significant change in the $R^2_{adj}$ values. By keeping these terms, we also risk the chance of overfitting the model. Hence, we do not add higher order terms of the predictors to the model.
+
+
+**11. Compare the R^2 adjusted value and RMSE value of the addictive model, interaction model and higher model.**
+
+After fitting the addictive model, the interaction model and higher model, the $R^2_{adj}$ values are: 0.683, 0.9114 and 0.9111 respectively. This indicates that the best model for predicting the selling price of a used car is the interaction model, since its $R^2_{adj}$ value of 0.9114 explains 91.14% of the variation of the selling price of a used car. Also the RMSE of the interaction term is 4059, which is lower than that of the addictive model which is 7668. 
+
+Finally, after comparing the $R^2_{adj}$ values and the RMSE of the 3 models, we conclude that the interaction model is the best for predicting the selling price of a used car.
+
+
+**12. Test the best model for model assumptions such as equal variance, linearity, normality.**
+
+**Checking for linearity**
+
+```{r echo=TRUE}
+#Test the best model for model assumptions such as equal variance, linearity, normality,
+
+# Linearity 
+par(mfrow=c(1,1))
+plot(new_Interac_firstordermodel, which = 1)
+```
+From the plot of the residuals vs fitted graph, the error terms appear to form a non linear pattern, indicating the model is not linear.
+
+**Checking the equal variance assumption**
+
+$H_o$: heteroscedasticity is not present(homoscedasticity)  
+$H_{alpha}$: heteroscedasticity is present
+
+
+```{r}
+#Heteroscedasticity
+library(lmtest)
+bptest(new_Interac_firstordermodel)
+library(olsrr)
+ols_test_f(new_Interac_firstordermodel)
+
+ggplot(new_Interac_firstordermodel, aes(x=.fitted, y=.resid)) +geom_point()+
+  geom_hline(yintercept = 0) +geom_smooth()+
+  ggtitle("Residual plot: Residual vs Fitted values") 
+
+```
+From the result of the Breusch-Pagan test, since the p-value: 2.2e-16 < 0.05, we reject the null hypothesis and conclude that heteroscedasticity is present in the model.
+
+
+**Checking the normality assumption**
+
+$H_o$: the sample data are significantly normally distributed  
+$H_{alpha}$: the sample data are not significantly normally distributed
+
+```{r}
+
+#Testing for Normality
+
+qplot(residuals(new_Interac_firstordermodel),
+      geom = "histogram",
+      binwidth = 1,
+      main = "Histogram of residual",
+      xlab = "residuals",color = "red",
+      fill = I("blue"))
+
+
+#Q-Q plot
+ggplot(Car1,aes(sample = new_Interac_firstordermodel$residuals))+ 
+  stat_qq()+ stat_qq_line()
+
+
+
+```
+From the plot of the histogram of residuals and that of the normal q-q plot, there is a lot of deviation at the upper and lower tail of the plot. Hence, we conclude that the model is not normally distributed.
+
+
+**13. Check for outliers using the cook's distance.**
+
+```{r}
+Car1[cooks.distance(new_Interac_firstordermodel)>0.5,] #have Cook statistics larger than 0.1
+plot(new_Interac_firstordermodel,pch=18,col="red",which=c(4))
+```
+The plot of the Cook's distance shows there are 3 outliers in the dataset. However at a threshold distance of 0.5, there is only one influential point in the dataset. 
+
+
+**14. Model transformation**
+
+After getting a good model that predicts the selling price of a used car, the model was tested for linearity, equal variance and normality assumptions and it failed all the test. Therefore we conducted a box cox transformation on the model in order to improve it.
+
+```{r}
+library(MASS)
+bc = boxcox(new_Interac_firstordermodel,lambda = seq(-2,2))
+```
+
+
+```{r}
+bestlambda=bc$x[which(bc$y==max(bc$y))]
+bestlambda
+```
+
+
+```{r}
+bcmodel=lm((((selling_price^0.1010101)-1)/0.1010101) ~age + km_driven + factor(fuel) + factor(seller_type) 
+                       + factor(transmission)+ factor(owner)+ mileage + engine + max_power + age*km_driven + age*factor(fuel) + age*factor(seller_type)
+                       + age*factor(transmission) + age*factor(owner) + age*engine + age*max_power + km_driven*factor(seller_type)
+                       + km_driven*factor(transmission) + km_driven*factor(transmission) + km_driven*max_power + factor(fuel)*factor(transmission)
+                       + factor(fuel)*factor(owner) + factor(fuel)*mileage + factor(fuel)*engine + factor(fuel)*max_power + factor(seller_type)*mileage
+                       + factor(seller_type)*engine + factor(seller_type)*max_power + factor(transmission)*factor(owner) + factor(transmission)*engine
+                       + factor(transmission)*max_power + factor(owner)*mileage + factor(owner)*engine + mileage*engine + mileage*max_power
+                       + engine*max_power
+                     ,data = Car1)
+summary(bcmodel)
+```
+
+**Checking the linearity assumption after conducting a boxcox transformation**
+
+```{r}
+par(mfrow=c(1,1))
+plot(bcmodel, which = 1)
+```
+After conducting a box cox transformation on the model, no discernible pattern appears in the residual vs fitted plot. Indicating that the linearity assumption of the model is valid.
+
+**Checking the equal variance assumption**
+
+$H_o$: heteroscedasticity is not present(homoscedasticity)  
+$H_{alpha}$: heteroscedasticity is present
+
+```{r}
+library(lmtest)
+bptest(bcmodel)
+library(olsrr)
+ols_test_f(bcmodel)
+
+ggplot(bcmodel, aes(x=.fitted, y=.resid)) +geom_point()+
+  geom_hline(yintercept = 0) +geom_smooth()+
+  ggtitle("Residual plot: Residual vs Fitted values") 
+```
+Although a box cox transformation was conducted on the model, the homoscedasticity assumption was failed to be met, since the p-value of the Breusch-Pagan test: 2.2e-16 < 0.05. Indicating we reject the null hypothesis.
+
+
+**Checking the normality assumption**
+
+$H_o$: the sample data are significantly normally distributed  
+$H_{alpha}$: the sample data are not significantly normally distributed
+
+```{r}
+#Testing for Normality
+
+qplot(residuals(bcmodel),
+      geom = "histogram",
+      binwidth = 0.5,
+      main = "Histogram of residual",
+      xlab = "residuals",color = "red",
+      fill = I("blue"))
+
+
+#Q-Q plot
+ggplot(Car1,aes(sample = bcmodel$residuals))+ 
+  stat_qq()+ stat_qq_line()
+
+```
+From the plot of the histogram and residuals, the bars form a bell shape indicating the model is approximately normally distributed. This is also supported by the normall Q_Q plot.
+
+
+After checking the linearity, homoscedasticity, normality assumption of the best interaction model, we discovered the model failed to satisfy all the model assumptions. Therefore, we conducted a box cox transformation on the model. The resulting model has an $R^2_{adj}$ value of 0.8978. Indicating 89.78% of the variation of the selling price of a used car can be explained by the model.
+
+
+Finally, although the $R^2_{adj}$ value of the best interaction model: 0.9114 is slightly higher than that of the boxcox transformation model: 0.8978, we chose the boxcox transformation model as the best model for predicting the selling price of a used car, since it satisfies the model assumptions.
+
+
+
+## Testing the Model
+
+**15. Using the Final Model to Predict the Selling Price of a Used Car**
+
+```{r,warning=FALSE} 
+newdata = data.frame(age=0, km_driven=10, fuel="Petrol",seller_type ="Individual",transmission="Automatic",owner="First Owner", mileage=15.4, engine=1400, max_power=100)
+predict(bcmodel,newdata,interval="predict")
+```
+Finally, after designing and testing the model, we used put it to test, to predict the selling price of a used car with:
+
+
+## Conclusion 
+
+1. The best fit model equation is stated below: 
+
+$\hat{selling price}$ = 
+9.262 
+- 0.2111 age 
+- 9.23e-06 km_driven 
++ 1.974e-01 fuel
++ 2.977e-01 seller_type(individual)
+- 7.240e-01 seller_type(Trustmark Dealer) 
++ 6.202e-02 Transmission(manual) 
++ 8.247e-01 owner(fourth & above) 
+- 6.375e-01 owner(second) 
++ 2.217e+01 owner(test drive) 
++ 3.331e-01 owner(third) 
++ 1.206e-01 mileage
++ 2.174e-03 engine 
++ 5.538e-02 max_power
++ 3.757e-07 age * km_driven
++ 5.708e-02 age * fuel(petrol)
++ 8.253e-03 age * seller_type(Individual) 
+- 1.342e-01 age * seller_type(Trustmark Dealer) 
+- 1.390e-02 age * transmission(Manual) 
++ 3.314e-02 age * owner(Fourth & Above Owner) 
+- 2.528e-03 age * owner(Second Owner) 
+- 3.713e-04 age * owner(Third owner) 
++ 2.260e-05 age * engine
+- 1.652e-03 age * max_power
++ 2.842e-07 km_driven * seller_type(Individual) 
++ 1.358e-05 km_driven * seller_type(Trustmark Dealer) 
++ 4.739e-06 km_driven * transmission(Manual) 
++ 6.811e-09 km_driven * max_power 
++ 2.577e-01 fuel(Petrol) * transmission (Manual) 
+-6.804e-01  fuel(Petrol) * owner(Fourth & Above Owner) 
+- 3.029e-02 fuel Petrol * owner(second) 
+- 5.499 fuel(Petrol) * owner(test drive) 
+- 2.341e-01 fuel(Petrol) * owner(third) 
+-4.287e-02 fuel(petrol) * mileage 
+- 1.724e-04 fuel(petrol) * engine
++ 1.219e-04 fuel(petrol) * max_power 
+- 1.085e-02 seller_type(Individual) * mileage 
+-1.125e-02 seller_type(Trustmark Dealer) * mileage
++ 1.848e-04 seller_type(Individual) * engine
++ 5.496e-04 seller_type(Trustmark Dealer) * engine 
+- 5.570e-03 seller_type(Individual) * max_power 
++ 2.891e-03 seller_type (Trustmark Dealer) * max_power
+-6.039e-01 transmission(Manual) * owner(Fourth & Above Owner) 
+-1.473e-01 transmission(Manual) * owner(Second Owner)  
+-1.939e-01 transmission(Manual) * owner(Third Owner)  
++1.408e-04 transmission(Manual) * engine 
+-8.596e-03 transmission(Manual) * max_power
+-5.163e-03  owner(Fourth & Above Owner) * mileage                    
++2.397e-02  owner(Second Owner) * mileage                             
+-9.889e-01  owner(Test Drive Car) * mileage                          
+-1.073e-02  owner(Third Owner) * mileage                             
+-3.755e-04  owner(Fourth & Above Owner) * engine                     
+ 1.445e-04  owner(Second Owner) * engine                             
+ -6.380e-05 owner(Third Owner) * engine                              
+-7.069e-05  mileage * engine                                               
++2.808e-04  mileage * max_power                                             
+-7.978e-06  engine * max_power                                             
+            
+2. After checking the linearity, homoscedasticity, normality assumption of the best interaction model, we discovered the model failed to satisfy all the model assumptions. Therefore, we conducted a box cox transformation on the model. The resulting model has an $R^2_{adj}$ value of 0.8978. Indicating 89.78% of the variation of the selling price of a used car can be explained by the model.
+
+
+  Finally, although the $R^2_{adj}$ value of the best interaction model: 0.9114 is slightly higher than that of the boxcox transformation model: 0.8978, we chose the boxcox transformation model as the best model for predicting the selling price of a used car, since it satisfies the model assumptions.
+
+3. The significant independent variables that are used to predict the selling_price are as follows:
+      age 
+      km_driven 
+      fuel
+      seller_type
+      Transmission 
+      owner
+      mileage
+      engine 
+      max_power
+      
+## Discussion
+
+1. Although the result of the partial F-test conducted above rejects the null hypothesis, indicating the number of seats variable be kept in the model, but by conducting the backward elimination, the best subset and a partial t-test, we concluded on using the model without the seat predictor variable.
+
+2. From our analysis, we thought that the best fit model would be the interaction model. But upon checking the linearity, homoscedasticity, normality assumption we found that in-spite of having the $R^2_{adj}$ a little less than the interaction model, the boxcox transformation model was a better fit. But even in this model, we find that heteroscedasticity still exists. 
+
+3. To further better the existing model, we can try to remove the heteroscedasticity that is present. We can aslo consider other independent variables to predict the model. Other machine learning models can be implemented to get better results.  
+
+
+## References
+
+1.Vehicle dataset | By Anon | Container: kaggle.com URL: https://www.kaggle.com/nehalbirla/vehicle-dataset-from-cardekho?select=Car+details+v3.csv | Accessed on: 2021-11-20
+
+
+
+
